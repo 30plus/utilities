@@ -1,0 +1,20 @@
+diff -r NVIDIA-Linux-x86_64-367.44/kernel/nvidia-drm/nvidia-drm-drv.c NVIDIA-Linux-x86_64-367.44.patched/kernel/nvidia-drm/nvidia-drm-drv.c
+38a39
+> #include <drm/drm_auth.h>
+422c423
+<                             struct drm_file *file_priv, bool from_release)
+---
+>                             struct drm_file *file_priv)
+455c456
+<         !file_priv->minor->master)
+---
+>         !file_priv->master)
+476c477
+<     drm_master_put(&file_priv->minor->master);
+---
+>     drm_master_put(&file_priv->master);
+diff -r NVIDIA-Linux-x86_64-367.44/kernel/nvidia-drm/nvidia-drm-modeset.c NVIDIA-Linux-x86_64-367.44.patched/kernel/nvidia-drm/nvidia-drm-modeset.c
+678c678
+<     drm_atomic_helper_swap_state(dev, state);
+---
+>     drm_atomic_helper_swap_state(state, false);
