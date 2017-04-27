@@ -1,0 +1,91 @@
+Subject: [PATCH] NVIDIA 381.09 support for linux 4.11
+
+---
+ kernel/nvidia-drm/nvidia-drm-drv.c   | 7 +++----
+ kernel/nvidia-drm/nvidia-drm-gem.c   | 7 +++----
+ kernel/nvidia-drm/nvidia-drm-linux.c | 3 ++-
+ 3 files changed, 8 insertions(+), 9 deletions(-)
+
+diff --git a/kernel/nvidia-drm/nvidia-drm-drv.c b/kernel/nvidia-drm/nvidia-drm-drv.c
+index d2d8cdf..eff9156 100644
+--- a/kernel/nvidia-drm/nvidia-drm-drv.c
++++ b/kernel/nvidia-drm/nvidia-drm-drv.c
+@@ -398,7 +398,7 @@ static int nvidia_drm_load(struct drm_device *dev, unsigned long flags)
+     return 0;
+ }
+ 
+-static int nvidia_drm_unload(struct drm_device *dev)
++static void nvidia_drm_unload(struct drm_device *dev)
+ {
+ #if defined(NV_DRM_ATOMIC_MODESET_AVAILABLE)
+     struct NvKmsKapiDevice *pDevice = NULL;
+@@ -412,7 +412,7 @@ static int nvidia_drm_unload(struct drm_device *dev)
+ 
+     if (!nvidia_drm_modeset_enabled(dev))
+     {
+-        return 0;
++        return;
+     }
+ 
+     mutex_lock(&nv_dev->lock);
+@@ -445,7 +445,7 @@ static int nvidia_drm_unload(struct drm_device *dev)
+ 
+ #endif /* NV_DRM_ATOMIC_MODESET_AVAILABLE */
+ 
+-    return 0;
++    return;
+ }
+ 
+ #if defined(NV_DRM_ATOMIC_MODESET_AVAILABLE)
+@@ -542,7 +542,6 @@ static int nvidia_drm_get_client_capability(struct drm_device *dev,
+                                             void *data,
+                                             struct drm_file *file_priv)
+ {
+-    struct nvidia_drm_device *nv_dev = dev->dev_private;
+     struct drm_nvidia_get_client_capability_params *params = data;
+ 
+     switch (params->capability)
+diff --git a/kernel/nvidia-drm/nvidia-drm-gem.c b/kernel/nvidia-drm/nvidia-drm-gem.c
+index 2cb2ee7..c378a1a 100644
+--- a/kernel/nvidia-drm/nvidia-drm-gem.c
++++ b/kernel/nvidia-drm/nvidia-drm-gem.c
+@@ -511,11 +511,10 @@ static void nvidia_drm_vma_open(struct vm_area_struct *vma)
+  * Note that nvidia_drm_vma_fault() can be called for different or same
+  * ranges of the same drm_gem_object simultaneously.
+  */
+-static int nvidia_drm_vma_fault(struct vm_area_struct *vma,
+-                                struct vm_fault *vmf)
++static int nvidia_drm_vma_fault(struct vm_fault *vmf)
+ {
+     unsigned long address = nv_page_fault_va(vmf);
+-    struct drm_gem_object *gem = vma->vm_private_data;
++    struct drm_gem_object *gem = vmf->vma->vm_private_data;
+     struct nvidia_drm_gem_object *nv_gem =
+                     DRM_GEM_OBJECT_TO_NV_GEM_OBJECT(gem);
+     unsigned long page_offset, pfn;
+@@ -526,7 +525,7 @@ static int nvidia_drm_vma_fault(struct vm_area_struct *vma,
+ 
+     page_offset = vmf->pgoff - drm_vma_node_start(&gem->vma_node);
+ 
+-    ret = vm_insert_pfn(vma, address, pfn + page_offset);
++    ret = vm_insert_pfn(vmf->vma, address, pfn + page_offset);
+ 
+     switch (ret) {
+         case 0:
+diff --git a/kernel/nvidia-drm/nvidia-drm-linux.c b/kernel/nvidia-drm/nvidia-drm-linux.c
+index 30d5758..03ea602 100644
+--- a/kernel/nvidia-drm/nvidia-drm-linux.c
++++ b/kernel/nvidia-drm/nvidia-drm-linux.c
+@@ -185,7 +185,8 @@ module_init(nv_linux_drm_init);
+ module_exit(nv_linux_drm_exit);
+ 
+ #if defined(MODULE_LICENSE)
+-  MODULE_LICENSE("MIT");
++  /* GPL-incompatible module nvidia-drm.ko uses GPL-only symbol 'refcount_inc' */
++  MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+   MODULE_INFO(supported, "external");
+-- 
+2.11.0
+
