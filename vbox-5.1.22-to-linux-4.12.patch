@@ -1,0 +1,33 @@
+diff -ru vboxhost/vboxnetadp/r0drv/linux/the-linux-kernel.h /usr/share/virtualbox/src/vboxhost/vboxnetadp/r0drv/linux/the-linux-kernel.h
+--- vboxhost/vboxnetadp/r0drv/linux/the-linux-kernel.h	2017-07-15 05:21:12.388069468 +0800
++++ /usr/share/virtualbox/src/vboxhost/vboxnetadp/r0drv/linux/the-linux-kernel.h	2017-07-15 05:44:08.756007483 +0800
+@@ -32,6 +32,7 @@
+  * Then use the linux bool type for all the stuff include here.
+  */
+ #include <iprt/types.h>
++#include <asm/set_memory.h>
+ #define bool linux_bool
+ 
+ #if RT_GNUC_PREREQ(4, 6)
+diff -ru vboxhost/vboxnetflt/r0drv/linux/the-linux-kernel.h /usr/share/virtualbox/src/vboxhost/vboxnetflt/r0drv/linux/the-linux-kernel.h
+--- vboxhost/vboxnetflt/r0drv/linux/the-linux-kernel.h	2017-07-15 05:21:12.391402831 +0800
++++ /usr/share/virtualbox/src/vboxhost/vboxnetflt/r0drv/linux/the-linux-kernel.h	2017-07-15 05:44:08.756007483 +0800
+@@ -32,6 +32,7 @@
+  * Then use the linux bool type for all the stuff include here.
+  */
+ #include <iprt/types.h>
++#include <asm/set_memory.h>
+ #define bool linux_bool
+ 
+ #if RT_GNUC_PREREQ(4, 6)
+diff -ru vboxhost/vboxpci/r0drv/linux/the-linux-kernel.h /usr/share/virtualbox/src/vboxhost/vboxpci/r0drv/linux/the-linux-kernel.h
+--- vboxhost/vboxpci/r0drv/linux/the-linux-kernel.h	2017-07-15 05:21:12.398069557 +0800
++++ /usr/share/virtualbox/src/vboxhost/vboxpci/r0drv/linux/the-linux-kernel.h	2017-07-15 05:44:08.756007483 +0800
+@@ -32,6 +32,7 @@
+  * Then use the linux bool type for all the stuff include here.
+  */
+ #include <iprt/types.h>
++#include <asm/set_memory.h>
+ #define bool linux_bool
+ 
+ #if RT_GNUC_PREREQ(4, 6)
