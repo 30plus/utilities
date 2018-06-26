@@ -1,0 +1,58 @@
+diff -ur NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia/nv.c NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia/nv.c
+--- NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia/nv.c	2018-05-24 20:27:47.000000000 +0800
++++ NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia/nv.c	2018-06-26 07:59:27.632805015 +0800
+@@ -40,7 +40,7 @@
+ 
+ #if (NV_BUILD_MODULE_INSTANCES != 0)
+ #if defined(MODULE_LICENSE)
+-MODULE_LICENSE("NVIDIA");
++MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+ MODULE_INFO(supported, "external");
+diff -ur NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia/nv-frontend.c NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia/nv-frontend.c
+--- NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia/nv-frontend.c	2018-05-24 20:27:48.000000000 +0800
++++ NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia/nv-frontend.c	2018-06-26 07:59:27.632805015 +0800
+@@ -15,7 +15,7 @@
+ #include "nv-frontend.h"
+ 
+ #if defined(MODULE_LICENSE)
+-MODULE_LICENSE("NVIDIA");
++MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+ MODULE_INFO(supported, "external");
+diff -ur NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia-drm/nvidia-drm-drv.c NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia-drm/nvidia-drm-drv.c
+--- NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia-drm/nvidia-drm-drv.c	2018-05-24 20:27:54.000000000 +0800
++++ NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia-drm/nvidia-drm-drv.c	2018-06-26 07:59:27.599471277 +0800
+@@ -55,6 +55,8 @@
+ #include <drm/drm_atomic_helper.h>
+ #endif
+ 
++#define DRM_CONTROL_ALLOW	BIT(3)
++
+ static struct nv_drm_device *dev_list = NULL;
+ 
+ #if defined(NV_DRM_ATOMIC_MODESET_AVAILABLE)
+diff -ur NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia-drm/nvidia-drm-linux.c NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia-drm/nvidia-drm-linux.c
+--- NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia-drm/nvidia-drm-linux.c	2018-05-24 20:27:54.000000000 +0800
++++ NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia-drm/nvidia-drm-linux.c	2018-06-26 07:59:27.599471277 +0800
+@@ -178,7 +178,7 @@
+ module_exit(nv_linux_drm_exit);
+ 
+ #if defined(MODULE_LICENSE)
+-  MODULE_LICENSE("MIT");
++  MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+   MODULE_INFO(supported, "external");
+diff -ur NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia-uvm/uvm_common.c NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia-uvm/uvm_common.c
+--- NVIDIA-Linux-x86_64-396.24.02/kernel/nvidia-uvm/uvm_common.c	2018-05-24 20:27:49.000000000 +0800
++++ NVIDIA-Linux-x86_64-396.24.02.mod/kernel/nvidia-uvm/uvm_common.c	2018-06-26 07:59:27.602804651 +0800
+@@ -378,5 +378,5 @@
+ MODULE_PARM_DESC(uvm_enable_builtin_tests,
+                  "Enable the UVM built-in tests. (This is a security risk)");
+ 
+-MODULE_LICENSE("MIT");
++MODULE_LICENSE("GPL");
+ MODULE_INFO(supported, "external");
