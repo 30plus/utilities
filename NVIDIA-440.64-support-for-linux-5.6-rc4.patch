@@ -1,0 +1,266 @@
+From d89dff3ee1865dcf8d07193887fc1a087b21adf7 Mon Sep 17 00:00:00 2001
+From: Xingyou Chen <rockrush@rockwork.org>
+Date: Fri, 6 Mar 2020 11:23:58 +0800
+Subject: [PATCH] Port 440.64 to linux 5.6.0-rc4
+
+Signed-off-by: Xingyou Chen <rockrush@rockwork.org>
+---
+ kernel/common/inc/nv-procfs.h  | 15 +++---
+ kernel/common/inc/nv-time.h    |  5 ++
+ kernel/nvidia-uvm/uvm_linux.h  |  4 +-
+ kernel/nvidia/linux_nvswitch.c |  6 +--
+ kernel/nvidia/nv-procfs.c      | 85 ++++++++++++++++------------------
+ kernel/nvidia/os-interface.c   | 11 +----
+ 6 files changed, 58 insertions(+), 68 deletions(-)
+
+diff --git a/kernel/common/inc/nv-procfs.h b/kernel/common/inc/nv-procfs.h
+index 8b53f86..35fe0ce 100644
+--- a/kernel/common/inc/nv-procfs.h
++++ b/kernel/common/inc/nv-procfs.h
+@@ -32,8 +32,8 @@
+    ({                                                                    \
+         struct proc_dir_entry *__entry;                                  \
+         int mode = (S_IFREG | S_IRUGO);                                  \
+-        const struct file_operations *fops = &nv_procfs_##__name##_fops; \
+-        if (fops->write != 0)                                            \
++        const struct proc_ops *fops = &nv_procfs_##__name##_fops; \
++        if (fops->proc_write != 0)                                       \
+             mode |= S_IWUSR;                                             \
+         __entry = proc_create_data(filename, mode, parent, fops, __data);\
+         __entry;                                                         \
+@@ -107,12 +107,11 @@
+         return single_release(inode, filep);                                  \
+     }                                                                         \
+                                                                               \
+-    static const struct file_operations nv_procfs_##name##_fops = {           \
+-        .owner      = THIS_MODULE,                                            \
+-        .open       = nv_procfs_open_##name,                                  \
+-        .read       = seq_read,                                               \
+-        .llseek     = seq_lseek,                                              \
+-        .release    = nv_procfs_release_##name,                               \
++    static const struct proc_ops nv_procfs_##name##_fops = {           \
++        .proc_open       = nv_procfs_open_##name,                             \
++        .proc_read       = seq_read,                                          \
++        .proc_lseek     = seq_lseek,                                          \
++        .proc_release    = nv_procfs_release_##name,                          \
+     };
+ 
+ #endif  /* CONFIG_PROC_FS */
+diff --git a/kernel/common/inc/nv-time.h b/kernel/common/inc/nv-time.h
+index 968b873..3f9510f 100644
+--- a/kernel/common/inc/nv-time.h
++++ b/kernel/common/inc/nv-time.h
+@@ -27,6 +27,11 @@
+ 
+ #include <linux/ktime.h>
+ 
++struct timeval {
++	__kernel_old_time_t tv_sec;
++	__kernel_suseconds_t    tv_usec;
++};
++
+ static inline void nv_gettimeofday(struct timeval *tv)
+ {
+ #ifdef NV_DO_GETTIMEOFDAY_PRESENT
+diff --git a/kernel/nvidia-uvm/uvm_linux.h b/kernel/nvidia-uvm/uvm_linux.h
+index 30a9dea..401170d 100644
+--- a/kernel/nvidia-uvm/uvm_linux.h
++++ b/kernel/nvidia-uvm/uvm_linux.h
+@@ -305,9 +305,9 @@ static inline uint64_t NV_DIV64(uint64_t dividend, uint64_t divisor, uint64_t *r
+ /* Return a nanosecond-precise value */
+ static inline NvU64 NV_GETTIME(void)
+ {
+-    struct timespec ts = {0};
++    struct timespec64 ts = {0};
+ 
+-    getrawmonotonic(&ts);
++    ktime_get_raw_ts64(&ts);
+ 
+     /* Wraps around every 583 years */
+     return (ts.tv_sec * 1000000000ULL + ts.tv_nsec);
+diff --git a/kernel/nvidia/linux_nvswitch.c b/kernel/nvidia/linux_nvswitch.c
+index 1d2c1bc..19f2a20 100644
+--- a/kernel/nvidia/linux_nvswitch.c
++++ b/kernel/nvidia/linux_nvswitch.c
+@@ -1578,10 +1578,10 @@ nvswitch_os_get_platform_time
+     void
+ )
+ {
+-    struct timespec ts;
++    struct timespec64 ts;
+ 
+-    getnstimeofday(&ts);
+-    return ((NvU64) timespec_to_ns(&ts));
++    ktime_get_real_ts64(&ts);
++    return ((NvU64) timespec64_to_ns(&ts));
+ }
+ 
+ void
+diff --git a/kernel/nvidia/nv-procfs.c b/kernel/nvidia/nv-procfs.c
+index 064d727..a475ec1 100644
+--- a/kernel/nvidia/nv-procfs.c
++++ b/kernel/nvidia/nv-procfs.c
+@@ -452,13 +452,12 @@ done:
+     return ((status < 0) ? status : (int)count);
+ }
+ 
+-static struct file_operations nv_procfs_registry_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_registry,
+-    .read    = seq_read,
+-    .write   = nv_procfs_write_file,
+-    .llseek  = seq_lseek,
+-    .release = nv_procfs_close_registry,
++static struct proc_ops nv_procfs_registry_fops = {
++    .proc_open    = nv_procfs_open_registry,
++    .proc_read    = seq_read,
++    .proc_write   = nv_procfs_write_file,
++    .proc_lseek  = seq_lseek,
++    .proc_release = nv_procfs_close_registry,
+ };
+ 
+ #if defined(CONFIG_PM)
+@@ -531,13 +530,12 @@ nv_procfs_open_suspend_depth(
+     return single_open(file, nv_procfs_show_suspend_depth, NULL);
+ }
+ 
+-static struct file_operations nv_procfs_suspend_depth_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_suspend_depth,
+-    .read    = seq_read,
+-    .write   = nv_procfs_write_suspend_depth,
+-    .llseek  = seq_lseek,
+-    .release = single_release
++static struct proc_ops nv_procfs_suspend_depth_fops = {
++    .proc_open    = nv_procfs_open_suspend_depth,
++    .proc_read    = seq_read,
++    .proc_write   = nv_procfs_write_suspend_depth,
++    .proc_lseek  = seq_lseek,
++    .proc_release = single_release
+ };
+ 
+ static int
+@@ -613,13 +611,12 @@ nv_procfs_open_suspend(
+     return single_open(file, nv_procfs_show_suspend, NULL);
+ }
+ 
+-static struct file_operations nv_procfs_suspend_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_suspend,
+-    .read    = seq_read,
+-    .write   = nv_procfs_write_suspend,
+-    .llseek  = seq_lseek,
+-    .release = single_release
++static struct proc_ops nv_procfs_suspend_fops = {
++    .proc_open    = nv_procfs_open_suspend,
++    .proc_read    = seq_read,
++    .proc_write   = nv_procfs_write_suspend,
++    .proc_lseek  = seq_lseek,
++    .proc_release = single_release
+ };
+ #endif
+ 
+@@ -724,11 +721,10 @@ done:
+     return status;
+ }
+ 
+-static struct file_operations nv_procfs_exercise_error_forwarding_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_exercise_error_forwarding,
+-    .write   = nv_procfs_write_file,
+-    .release = nv_procfs_close_exercise_error_forwarding,
++static struct proc_ops nv_procfs_exercise_error_forwarding_fops = {
++    .proc_open    = nv_procfs_open_exercise_error_forwarding,
++    .proc_write   = nv_procfs_write_file,
++    .proc_release = nv_procfs_close_exercise_error_forwarding,
+ };
+ 
+ static int
+@@ -851,13 +847,12 @@ done:
+     return rc;
+ }
+ 
+-static struct file_operations nv_procfs_unbind_lock_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_unbind_lock,
+-    .read    = seq_read,
+-    .write   = nv_procfs_write_file,
+-    .llseek  = seq_lseek,
+-    .release = nv_procfs_close_unbind_lock,
++static struct proc_ops nv_procfs_unbind_lock_fops = {
++    .proc_open    = nv_procfs_open_unbind_lock,
++    .proc_read    = seq_read,
++    .proc_write   = nv_procfs_write_file,
++    .proc_lseek  = seq_lseek,
++    .proc_release = nv_procfs_close_unbind_lock,
+ };
+ 
+ static const char*
+@@ -1187,21 +1182,19 @@ done:
+     return retval;
+ }
+ 
+-static const struct file_operations nv_procfs_numa_status_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_numa_status,
+-    .read    = seq_read,
+-    .write   = nv_procfs_write_file,
+-    .llseek  = seq_lseek,
+-    .release = nv_procfs_close_numa_status,
++static const struct proc_ops nv_procfs_numa_status_fops = {
++    .proc_open    = nv_procfs_open_numa_status,
++    .proc_read    = seq_read,
++    .proc_write   = nv_procfs_write_file,
++    .proc_lseek  = seq_lseek,
++    .proc_release = nv_procfs_close_numa_status,
+ };
+ 
+-static const struct file_operations nv_procfs_offline_pages_fops = {
+-    .owner   = THIS_MODULE,
+-    .open    = nv_procfs_open_offline_pages,
+-    .read    = seq_read,
+-    .llseek  = seq_lseek,
+-    .release = nv_procfs_close_offline_pages,
++static const struct proc_ops nv_procfs_offline_pages_fops = {
++    .proc_open    = nv_procfs_open_offline_pages,
++    .proc_read    = seq_read,
++    .proc_lseek  = seq_lseek,
++    .proc_release = nv_procfs_close_offline_pages,
+ };
+ 
+ static int
+diff --git a/kernel/nvidia/os-interface.c b/kernel/nvidia/os-interface.c
+index 07f1b77..c1f6789 100644
+--- a/kernel/nvidia/os-interface.c
++++ b/kernel/nvidia/os-interface.c
+@@ -13,15 +13,8 @@
+ 
+ #include "os-interface.h"
+ #include "nv-linux.h"
+-
+ #include "nv-time.h"
+ 
+-
+-
+-
+-
+-
+-
+ extern char *NVreg_TemporaryFilePath;
+ 
+ #define MAX_ERROR_STRING 512
+@@ -477,9 +470,9 @@ NV_STATUS NV_API_CALL os_get_current_time(
+ 
+ void NV_API_CALL os_get_current_tick(NvU64 *nseconds)
+ {
+-    struct timespec ts;
++    struct timespec64 ts;
+ 
+-    jiffies_to_timespec(jiffies, &ts);
++    jiffies_to_timespec64(jiffies, &ts);
+ 
+     *nseconds = ((NvU64)ts.tv_sec * NSEC_PER_SEC + (NvU64)ts.tv_nsec);
+ }
+-- 
+2.25.1
+
