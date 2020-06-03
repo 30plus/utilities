@@ -1,0 +1,31 @@
+From f7012b5ee5512d269ed23a65006ff009ba704032 Mon Sep 17 00:00:00 2001
+From: Xingyou Chen <rockrush@rockwork.org>
+Date: Wed, 3 Jun 2020 15:10:15 +0800
+Subject: [PATCH] ignore check of set_memory_array_<uc|wb>
+
+On recent kernels, set_memory_array_<uc|wb> are finally removed,
+but conftest check fails and still define NV_SET_MEMORY_UC_PRESENT.
+
+Signed-off-by: Xingyou Chen <rockrush@rockwork.org>
+---
+ conftest.sh | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/conftest.sh b/conftest.sh
+index 8f807a1..f222d02 100755
+--- a/conftest.sh
++++ b/conftest.sh
+@@ -475,7 +475,9 @@ compile_test() {
+                 set_memory_array_uc();
+             }"
+ 
+-            compile_check_conftest "$CODE" "NV_SET_MEMORY_ARRAY_UC_PRESENT" "" "functions"
++			# TODO: This check fails on recent kernels, and defines NV_SET_MEMORY_ARRAY_UC_PRESENT
++			#		while set_memory_array_<uc|wb> are not available
++            # compile_check_conftest "$CODE" "NV_SET_MEMORY_ARRAY_UC_PRESENT" "" "functions"
+         ;;
+ 
+         sysfs_slab_unlink)
+-- 
+2.27.0.rc2
+
