@@ -1,0 +1,220 @@
+From 7b64544a9eccc1c7c32b3b20280fc5828ce04305 Mon Sep 17 00:00:00 2001
+From: Xingyou Chen <rockrush@rockwork.org>
+Date: Fri, 11 Sep 2020 08:06:34 +0800
+Subject: [PATCH] port 450.66 to linux 5.9.0-rc4
+
+Signed-off-by: Xingyou Chen <rockrush@rockwork.org>
+---
+ common/inc/nv-mm.h            |  4 ++--
+ conftest.sh                   |  6 ++----
+ nvidia-drm/nvidia-drm-drv.c   | 10 +++-------
+ nvidia-drm/nvidia-drm-gem.h   |  2 +-
+ nvidia-drm/nvidia-drm-utils.c |  6 ++++--
+ nvidia-drm/nvidia-drm-utils.h |  1 +
+ nvidia-uvm/uvm8_tools.c       |  2 +-
+ nvidia-uvm/uvm8_va_range.h    |  2 +-
+ nvidia/nv-frontend.c          |  4 +++-
+ nvidia/nv-mmap.c              |  1 -
+ nvidia/nv-pci.c               |  2 +-
+ 11 files changed, 19 insertions(+), 21 deletions(-)
+
+diff --git a/common/inc/nv-mm.h b/common/inc/nv-mm.h
+index b04ff67..5b38de4 100644
+--- a/common/inc/nv-mm.h
++++ b/common/inc/nv-mm.h
+@@ -141,12 +141,12 @@ typedef int vm_fault_t;
+ 
+         #if defined(NV_GET_USER_PAGES_REMOTE_HAS_LOCKED_ARG)
+ 
+-               return get_user_pages_remote(tsk, mm, start, nr_pages, flags,
++               return get_user_pages_remote(mm, start, nr_pages, flags,
+                                             pages, vmas, NULL);
+ 
+         #else
+ 
+-               return get_user_pages_remote(tsk, mm, start, nr_pages, flags,
++               return get_user_pages_remote(mm, start, nr_pages, flags,
+                                             pages, vmas);
+ 
+         #endif
+diff --git a/conftest.sh b/conftest.sh
+index a4ebf81..80d3569 100755
+--- a/conftest.sh
++++ b/conftest.sh
+@@ -2598,8 +2598,7 @@ compile_test() {
+             echo "#define NV_GET_USER_PAGES_REMOTE_PRESENT" | append_conftest "functions"
+             echo "$CONFTEST_PREAMBLE
+             #include <linux/mm.h>
+-            long get_user_pages_remote(struct task_struct *tsk,
+-                                       struct mm_struct *mm,
++            long get_user_pages_remote(struct mm_struct *mm,
+                                        unsigned long start,
+                                        unsigned long nr_pages,
+                                        int write,
+@@ -2623,8 +2622,7 @@ compile_test() {
+ 
+             echo "$CONFTEST_PREAMBLE
+             #include <linux/mm.h>
+-            long get_user_pages_remote(struct task_struct *tsk,
+-                                       struct mm_struct *mm,
++            long get_user_pages_remote(struct mm_struct *mm,
+                                        unsigned long start,
+                                        unsigned long nr_pages,
+                                        unsigned int gup_flags,
+diff --git a/nvidia-drm/nvidia-drm-drv.c b/nvidia-drm/nvidia-drm-drv.c
+index c6ba478..d3f9d46 100644
+--- a/nvidia-drm/nvidia-drm-drv.c
++++ b/nvidia-drm/nvidia-drm-drv.c
+@@ -473,16 +473,12 @@ static void nv_drm_unload(struct drm_device *dev)
+ 
+ #if defined(NV_DRM_ATOMIC_MODESET_AVAILABLE)
+ 
+-static int nv_drm_master_set(struct drm_device *dev,
++static void nv_drm_master_set(struct drm_device *dev,
+                              struct drm_file *file_priv, bool from_open)
+ {
+     struct nv_drm_device *nv_dev = to_nv_device(dev);
+ 
+-    if (!nvKms->grabOwnership(nv_dev->pDevice)) {
+-        return -EINVAL;
+-    }
+-
+-    return 0;
++    nvKms->grabOwnership(nv_dev->pDevice);
+ }
+ 
+ #if defined(NV_DRM_MASTER_DROP_HAS_FROM_RELEASE_ARG)
+@@ -719,7 +715,7 @@ static struct drm_driver nv_drm_driver = {
+ #endif
+                                DRIVER_GEM  | DRIVER_RENDER,
+ 
+-    .gem_free_object        = nv_drm_gem_free,
++    .gem_free_object_unlocked        = nv_drm_gem_free,
+ 
+     .ioctls                 = nv_drm_ioctls,
+     .num_ioctls             = ARRAY_SIZE(nv_drm_ioctls),
+diff --git a/nvidia-drm/nvidia-drm-gem.h b/nvidia-drm/nvidia-drm-gem.h
+index 4e7ffd3..e554ce4 100644
+--- a/nvidia-drm/nvidia-drm-gem.h
++++ b/nvidia-drm/nvidia-drm-gem.h
+@@ -96,7 +96,7 @@ static inline void
+ nv_drm_gem_object_unreference_unlocked(struct nv_drm_gem_object *nv_gem)
+ {
+ #if defined(NV_DRM_GEM_OBJECT_GET_PRESENT)
+-    drm_gem_object_put_unlocked(&nv_gem->base);
++    drm_gem_object_put_locked(&nv_gem->base);
+ #else
+     drm_gem_object_unreference_unlocked(&nv_gem->base);
+ #endif
+diff --git a/nvidia-drm/nvidia-drm-utils.c b/nvidia-drm/nvidia-drm-utils.c
+index da485c6..98b4638 100644
+--- a/nvidia-drm/nvidia-drm-utils.c
++++ b/nvidia-drm/nvidia-drm-utils.c
+@@ -38,6 +38,8 @@
+ #include "nvidia-drm-priv.h"
+ #include "nvidia-drm-utils.h"
+ 
++int vrefresh = 0;
++
+ struct NvKmsKapiConnectorInfo*
+ nvkms_get_connector_info(struct NvKmsKapiDevice *pDevice,
+                          NvKmsKapiConnector hConnector)
+@@ -103,7 +105,7 @@ void
+ nvkms_display_mode_to_drm_mode(const struct NvKmsKapiDisplayMode *displayMode,
+                                struct drm_display_mode *mode)
+ {
+-    mode->vrefresh    = (displayMode->timings.refreshRate + 500) / 1000; /* In Hz */
++    vrefresh    = (displayMode->timings.refreshRate + 500) / 1000; /* In Hz */
+ 
+     mode->clock       = (displayMode->timings.pixelClockHz + 500) / 1000; /* In Hz */
+ 
+@@ -159,7 +161,7 @@ nvkms_display_mode_to_drm_mode(const struct NvKmsKapiDisplayMode *displayMode,
+ void drm_mode_to_nvkms_display_mode(const struct drm_display_mode *src,
+                                     struct NvKmsKapiDisplayMode *dst)
+ {
+-    dst->timings.refreshRate  = src->vrefresh * 1000;
++    dst->timings.refreshRate  = vrefresh * 1000;
+ 
+     dst->timings.pixelClockHz = src->clock * 1000; /* In Hz */
+ 
+diff --git a/nvidia-drm/nvidia-drm-utils.h b/nvidia-drm/nvidia-drm-utils.h
+index 30324aa..f32d624 100644
+--- a/nvidia-drm/nvidia-drm-utils.h
++++ b/nvidia-drm/nvidia-drm-utils.h
+@@ -31,6 +31,7 @@
+ 
+ enum drm_plane_type;
+ struct drm_display_mode;
++extern int vrefresh;
+ 
+ struct NvKmsKapiConnectorInfo*
+ nvkms_get_connector_info(struct NvKmsKapiDevice *pDevice,
+diff --git a/nvidia-uvm/uvm8_tools.c b/nvidia-uvm/uvm8_tools.c
+index 620e1cc..7b19e54 100644
+--- a/nvidia-uvm/uvm8_tools.c
++++ b/nvidia-uvm/uvm8_tools.c
+@@ -192,7 +192,7 @@ static uvm_tools_event_tracker_t *tools_event_tracker(struct file *filp)
+ {
+     long event_tracker = atomic_long_read((atomic_long_t *)&filp->private_data);
+ 
+-    smp_read_barrier_depends();
++    do {} while (0);
+     return (uvm_tools_event_tracker_t *)event_tracker;
+ }
+ 
+diff --git a/nvidia-uvm/uvm8_va_range.h b/nvidia-uvm/uvm8_va_range.h
+index 69cb0a0..50ab280 100644
+--- a/nvidia-uvm/uvm8_va_range.h
++++ b/nvidia-uvm/uvm8_va_range.h
+@@ -755,7 +755,7 @@ static uvm_va_block_t *uvm_va_range_block(uvm_va_range_t *va_range, size_t index
+     // make sure that any initialization of this block by the creating thread is
+     // visible to later accesses in this thread, which requires a data
+     // dependency barrier.
+-    smp_read_barrier_depends();
++    do {} while (0);
+     return block;
+ }
+ 
+diff --git a/nvidia/nv-frontend.c b/nvidia/nv-frontend.c
+index 45d91b3..6308269 100644
+--- a/nvidia/nv-frontend.c
++++ b/nvidia/nv-frontend.c
+@@ -15,7 +15,9 @@
+ #include "nv-frontend.h"
+ 
+ #if defined(MODULE_LICENSE)
+-MODULE_LICENSE("NVIDIA");
++/* NOTE: nvidia-uvm calls nvidia.ko, so inherits propriatory license,
++ * but still needs some GPL'ed calls from /kernel */
++MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+ MODULE_INFO(supported, "external");
+diff --git a/nvidia/nv-mmap.c b/nvidia/nv-mmap.c
+index 39d5820..7f2327e 100644
+--- a/nvidia/nv-mmap.c
++++ b/nvidia/nv-mmap.c
+@@ -659,7 +659,6 @@ int nvidia_mmap(
+     nv_file_private_t *nvfp = NV_GET_FILE_PRIVATE(file);
+     nvidia_stack_t *sp = NULL;
+     int status;
+-    int i = 0;
+ 
+     //
+     // Do not allow mmap operation if this is a fd into
+diff --git a/nvidia/nv-pci.c b/nvidia/nv-pci.c
+index 9a8a715..b7ee57d 100644
+--- a/nvidia/nv-pci.c
++++ b/nvidia/nv-pci.c
+@@ -424,7 +424,7 @@ nv_pci_probe
+ 
+ #if defined(CONFIG_VGA_ARB) && !defined(NVCPU_PPC64LE)
+ #if defined(VGA_DEFAULT_DEVICE)
+-    vga_tryget(VGA_DEFAULT_DEVICE, VGA_RSRC_LEGACY_MASK);
++    vga_get(VGA_DEFAULT_DEVICE, VGA_RSRC_LEGACY_MASK, 0);
+ #endif
+     vga_set_legacy_decoding(pci_dev, VGA_RSRC_NONE);
+ #endif
+-- 
+2.27.0
+
