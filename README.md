@@ -3,6 +3,7 @@ Some Utilities
 
 ## pidns
 Query for pid mapping inside a container, by leaking a little data.
+Only works on Linux 3.10.
 
 Currently supports:
 1. query for host pid via pid inside container

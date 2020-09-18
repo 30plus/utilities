@@ -11,7 +11,7 @@
 #define PIDNS_CMD_TYPE		'v'
 #define CPUSET_SUBSYS_ID	6
 #define CGROUP_PATH_MAX		256
-//kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-podd8f61354_2394_410f_870f_c4e14829afac.slice/docker-c6aa250b3667760eb98341b4b7f89d272689621bd9a81dd0cb18ecbf8c0d7d5d.scope                                                                     
+#define PIDNS_MSG			"Reserved by Rockwork"
 
 /* container.pid => init_ns.pid */
 #define PIDNS_CMD_OUT	_IOWR(PIDNS_CMD_TYPE, 1, int32_t *)
@@ -24,7 +24,7 @@ static struct proc_dir_entry *pidns_ent;
 
 static ssize_t pidns_read(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
 {
-	char *msg = "Reserved by HIKVision\n";
+	char *msg = PIDNS_MS;
 	int len = strlen(msg);
 
 	if (*ppos > 0 || count < len)
@@ -50,12 +50,12 @@ static long pidns_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct task_struct *task = NULL;
 	char ns[CGROUP_PATH_MAX] = {'\0'};
 
+	retval = copy_from_user(&pid, (int32_t *)arg, sizeof(pid_t));
+	if (retval)
+		return -EFAULT;
+
 	switch (cmd) {
 	case PIDNS_CMD_OUT:
-		retval = copy_from_user(&pid, (int32_t *)arg, sizeof(pid_t));
-		if (retval)
-			return -EFAULT;
-
 		pid_ptr = find_vpid(pid);
 		if (pid_ptr)
 			pid = pid_ptr->numbers[0].nr;
@@ -67,10 +67,6 @@ static long pidns_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		break;
 	case PIDNS_CMD_IN:
-		retval = copy_from_user(&pid, (int32_t *)arg, sizeof(pid_t));
-		if (retval)
-			return -EFAULT;
-
 		pid_ptr = find_pid_ns(pid, &init_pid_ns);
 		if (pid_ptr)
 			pid = pid_ptr->numbers[pid_ptr->level].nr;
@@ -82,10 +78,6 @@ static long pidns_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -EFAULT;
 		break;
 	case PIDNS_CMD_NS:
-		retval = copy_from_user(&pid, (int32_t *)arg, sizeof(pid_t));
-		if (retval)
-			return -EFAULT;
-
 		pid_ptr = find_pid_ns(pid, &init_pid_ns);
 		task = pid_task(pid_ptr, PIDTYPE_PID);
 		if (task) {
