@@ -1,0 +1,79 @@
+From 8d869c787b2651a927d618672c240743e6e1ae30 Mon Sep 17 00:00:00 2001
+From: Xingyou Chen <rockrush@rockwork.org>
+Date: Mon, 19 Oct 2020 18:26:42 +0800
+Subject: [PATCH] [PATCH] port 455.28 to linux 5.9
+
+Signed-off-by: Xingyou Chen <rockrush@rockwork.org>
+---
+ nvidia-drm/nvidia-drm-gem-user-memory.c |  4 +++-
+ nvidia/nv-dma.c                         | 13 ++++++++-----
+ nvidia/nv-frontend.c                    |  3 ++-
+ 3 files changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/nvidia-drm/nvidia-drm-gem-user-memory.c b/nvidia-drm/nvidia-drm-gem-user-memory.c
+index 737d84c..3fd501b 100644
+--- a/nvidia-drm/nvidia-drm-gem-user-memory.c
++++ b/nvidia-drm/nvidia-drm-gem-user-memory.c
+@@ -58,9 +58,11 @@ void __nv_drm_gem_user_memory_free(struct nv_drm_gem_object *nv_gem)
+ static struct sg_table *__nv_drm_gem_user_memory_prime_get_sg_table(
+     struct nv_drm_gem_object *nv_gem)
+ {
++	/* by dev=NULL, max_segment is set to SCATTERLIST_MAX_SEGMENT instead of dma_max_mapping_size(dev->dev); */
++	struct drm_device *dev = NULL;
+     struct nv_drm_gem_user_memory *nv_user_memory = to_nv_user_memory(nv_gem);
+ 
+-    return drm_prime_pages_to_sg(nv_user_memory->pages,
++    return drm_prime_pages_to_sg(dev, nv_user_memory->pages,
+                                  nv_user_memory->pages_count);
+ }
+ 
+diff --git a/nvidia/nv-dma.c b/nvidia/nv-dma.c
+index 6924ec8..570493c 100644
+--- a/nvidia/nv-dma.c
++++ b/nvidia/nv-dma.c
+@@ -13,6 +13,7 @@
+ 
+ #include "os-interface.h"
+ #include "nv-linux.h"
++#include <linux/dma-map-ops.h>
+ 
+ #define NV_DMA_DEV_PRINTF(debuglevel, dma_dev, format, ... )                \
+     nv_printf(debuglevel, "NVRM: %s: " format,                              \
+@@ -622,13 +623,15 @@ NV_STATUS NV_API_CALL nv_dma_unmap_alloc
+     return NV_OK;
+ }
+ 
+-static NvBool nv_dma_is_map_resource_implemented
+-(
+-    nv_dma_device_t *dma_dev
+-)
++extern const struct dma_map_ops *dma_ops;
++
++static NvBool nv_dma_is_map_resource_implemented(nv_dma_device_t *dma_dev)
+ {
+ #if defined(NV_DMA_MAP_RESOURCE_PRESENT)
+-    const struct dma_map_ops *ops = get_dma_ops(dma_dev->dev);
++    //const struct dma_map_ops *ops = get_dma_ops(dma_dev->dev);
++    const struct dma_map_ops *ops = dma_ops;
++	if (dma_dev->dev->dma_ops)
++			ops = dma_dev->dev->dma_ops;
+ 
+     if (ops == NULL)
+     {
+diff --git a/nvidia/nv-frontend.c b/nvidia/nv-frontend.c
+index 45d91b3..4bcadcd 100644
+--- a/nvidia/nv-frontend.c
++++ b/nvidia/nv-frontend.c
+@@ -15,7 +15,8 @@
+ #include "nv-frontend.h"
+ 
+ #if defined(MODULE_LICENSE)
+-MODULE_LICENSE("NVIDIA");
++/* Some kernel codes are restricted to GPL modules, this is illegal, and crude */
++MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+ MODULE_INFO(supported, "external");
+-- 
+2.28.0
+
