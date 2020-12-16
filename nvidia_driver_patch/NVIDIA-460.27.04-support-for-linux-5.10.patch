@@ -1,0 +1,40 @@
+From fa05be8aa17cd62a34f2f4695332a9499d01a1d6 Mon Sep 17 00:00:00 2001
+From: Xingyou Chen <rockrush@rockwork.org>
+Date: Wed, 16 Dec 2020 13:24:00 +0800
+Subject: [PATCH] port 460.27.04 to linux 5.10
+Content-Type: text/plain; charset="utf-8"
+
+Signed-off-by: Xingyou Chen <rockrush@rockwork.org>
+---
+ nvidia-drm/nvidia-drm-modeset.c | 1 -
+ nvidia/nv-frontend.c            | 2 +-
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/nvidia-drm/nvidia-drm-modeset.c b/nvidia-drm/nvidia-drm-modeset.c
+index 83c635aa315b..6e0221f8ec83 100644
+--- a/nvidia-drm/nvidia-drm-modeset.c
++++ b/nvidia-drm/nvidia-drm-modeset.c
+@@ -93,7 +93,6 @@ static bool __will_generate_flip_event(struct drm_crtc *crtc,
+         to_nv_crtc_state(new_crtc_state);
+     struct drm_plane_state *old_plane_state = NULL;
+     struct drm_plane *plane = NULL;
+-    struct drm_plane *primary_plane = crtc->primary;
+     bool primary_event = false;
+     bool overlay_event = false;
+     int i;
+diff --git a/nvidia/nv-frontend.c b/nvidia/nv-frontend.c
+index 45d91b38b50b..244a7a8c72ac 100644
+--- a/nvidia/nv-frontend.c
++++ b/nvidia/nv-frontend.c
+@@ -15,7 +15,7 @@
+ #include "nv-frontend.h"
+ 
+ #if defined(MODULE_LICENSE)
+-MODULE_LICENSE("NVIDIA");
++MODULE_LICENSE("GPL");
+ #endif
+ #if defined(MODULE_INFO)
+ MODULE_INFO(supported, "external");
+-- 
+2.29.2
+
